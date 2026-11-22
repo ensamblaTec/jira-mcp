@@ -1,0 +1,51 @@
+# Binaries
+bin/
+/jira-mcp
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test & coverage artifacts
+*.test
+*.out
+*.prof
+coverage.html
+coverage.txt
+cover.out
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite*
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+.secrets*
+*.secret*
+*credentials*
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+.mcp.json
+
+# AI / IDEs / Editors
+.claude/
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS & VCS artifacts
+.DS_Store
+Thumbs.db
+*.bundle
+
+# Go workspace files
+go.work
+go.work.sum

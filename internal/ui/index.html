@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jira Agile Boards - Local Viewer</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-column: #182234;
+      --bg-card: #243247;
+      --bg-card-hover: #2d3e58;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --border: #334155;
+      --badge-scrum: #818cf8;
+      --badge-kanban: #34d399;
+      --prio-high: #f87171;
+      --prio-med: #fbbf24;
+      --prio-low: #60a5fa;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg-primary); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Top Navigation */
+    header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem; }
+    .brand-icon { background: linear-gradient(135deg, #0284c7, #38bdf8); width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; font-size: 0.9rem; }
+
+    .controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    select, input, button {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 7px 12px;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    select:focus, input:focus { border-color: var(--accent); }
+    button { cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+    button.btn-primary { background-color: var(--accent); color: #0f172a; border-color: var(--accent); }
+    button.btn-primary:hover { background-color: var(--accent-hover); }
+    button.btn-secondary:hover { background-color: var(--border); }
+
+    .toggle-group {
+      display: flex;
+      background-color: var(--bg-column);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .toggle-btn {
+      background: transparent;
+      border: none;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      border-radius: 0;
+    }
+    .toggle-btn.active {
+      background-color: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+    }
+
+    /* Sub-header / Board info */
+    .board-header {
+      background-color: rgba(30, 41, 59, 0.6);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .board-title-area { display: flex; align-items: center; gap: 12px; }
+    .board-title { font-size: 1.25rem; font-weight: 700; }
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .badge-scrum { background-color: rgba(129, 140, 248, 0.2); color: var(--badge-scrum); border: 1px solid var(--badge-scrum); }
+    .badge-kanban { background-color: rgba(52, 211, 153, 0.2); color: var(--badge-kanban); border: 1px solid var(--badge-kanban); }
+    .badge-project { background-color: rgba(56, 189, 248, 0.15); color: var(--accent); border: 1px solid var(--accent); }
+
+    .sprint-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background-color: var(--bg-secondary);
+      padding: 4px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    .sprint-banner strong { color: var(--text-main); }
+
+    /* Board Container & Columns */
+    main {
+      flex: 1;
+      display: flex;
+      gap: 16px;
+      padding: 16px 24px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: stretch;
+    }
+
+    .column {
+      background-color: var(--bg-column);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      width: 320px;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      max-height: 100%;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .column-header {
+      padding: 12px 14px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--border);
+    }
+    .column-count {
+      background-color: var(--bg-card);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .card-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* Cards */
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card:hover {
+      background-color: var(--bg-card-hover);
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+    }
+    .card-key {
+      font-weight: 700;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .card-type {
+      background-color: rgba(255, 255, 255, 0.08);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .card-summary {
+      font-size: 0.88rem;
+      line-height: 1.35;
+      font-weight: 500;
+      color: var(--text-main);
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 6px;
+    }
+    .card-assignee { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+    .avatar-circle {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background-color: #3b82f6;
+      display: grid;
+      place-items: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .prio-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .prio-high { background-color: var(--prio-high); }
+    .prio-med { background-color: var(--prio-med); }
+    .prio-low { background-color: var(--prio-low); }
+
+    /* Backlog Drawer / Panel */
+    .backlog-column {
+      border-left: 2px dashed var(--border);
+      background-color: rgba(24, 34, 52, 0.8);
+    }
+    .backlog-column .column-header {
+      border-bottom-color: var(--border);
+      color: var(--text-muted);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(3px);
+      display: none;
+      place-items: center;
+      z-index: 100;
+    }
+    .modal {
+      background-color: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      width: 600px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: #fff; }
+
+    /* Spinner */
+    .spinner {
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top: 3px solid var(--accent);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">J</div>
+      <span>Jira Local Boards</span>
+    </div>
+
+    <div class="controls">
+      <!-- Board Selector -->
+      <select id="boardSelect" onchange="loadSelectedBoard()">
+        <option value="">Cargando tableros...</option>
+      </select>
+
+      <!-- Search Filter -->
+      <input type="text" id="searchInput" placeholder="Filtrar por texto o clave..." oninput="filterCards()" style="width: 220px;">
+
+      <!-- Mode Toggle: Local vs Live -->
+      <div class="toggle-group">
+        <button id="btnModeLocal" class="toggle-btn active" onclick="setMode(true)">SQLite Local</button>
+        <button id="btnModeLive" class="toggle-btn" onclick="setMode(false)">Jira Live</button>
+      </div>
+
+      <!-- Sync Button -->
+      <button class="btn-primary" id="btnSync" onclick="triggerSync()">
+        <span id="syncIcon">⟳</span> Sincronizar
+      </button>
+    </div>
+  </header>
+
+  <div class="board-header">
+    <div class="board-title-area">
+      <span class="board-title" id="boardTitle">Selecciona un Tablero</span>
+      <span id="badgeType" class="badge badge-scrum" style="display: none;">SCRUM</span>
+      <span id="badgeProject" class="badge badge-project" style="display: none;">PROJ</span>
+    </div>
+    <div id="sprintInfo" class="sprint-banner" style="display: none;">
+      <span>Sprint Activo: <strong id="sprintName">-</strong></span>
+      <span>• Fin: <span id="sprintEnd">-</span></span>
+    </div>
+  </div>
+
+  <main id="boardColumnsContainer">
+    <div style="margin: auto; color: var(--text-muted); font-size: 1.1rem; text-align: center;">
+      <p>Cargando información del tablero...</p>
+    </div>
+  </main>
+
+  <!-- Card Details Modal -->
+  <div class="modal-overlay" id="cardModalOverlay" onclick="closeModal(event)">
+    <div class="modal" id="cardModal" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <span class="badge badge-project" id="modalKey">KEY-0</span>
+          <span class="card-type" id="modalType" style="margin-left: 8px;">Task</span>
+        </div>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <h2 id="modalSummary" style="font-size: 1.2rem; line-height: 1.4;"></h2>
+      
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.85rem; background: var(--bg-column); padding: 12px; border-radius: 6px;">
+        <div><strong>Estado:</strong> <span id="modalStatus">-</span></div>
+        <div><strong>Prioridad:</strong> <span id="modalPriority">-</span></div>
+        <div><strong>Asignado:</strong> <span id="modalAssignee">-</span></div>
+        <div><strong>Actualizado:</strong> <span id="modalUpdated">-</span></div>
+      </div>
+
+      <div>
+        <h4 style="margin-bottom: 6px; font-size: 0.9rem; color: var(--text-muted);">Acciones Rápidas</h4>
+        <a id="modalJiraLink" href="#" target="_blank" style="color: var(--accent); text-decoration: none; font-size: 0.85rem;">Ver directamente en Jira Cloud &rarr;</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentBoard = null;
+    let localOnly = true;
+    let allBoards = [];
+    let boardData = null;
+
+    function escapeHTML(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    async function init() {
+      await loadBoardsList();
+    }
+
+    async function loadBoardsList() {
+      try {
+        const res = await fetch('/api/boards');
+        if (!res.ok) throw new Error("Error cargando tableros");
+        allBoards = await res.json();
+        
+        const sel = document.getElementById('boardSelect');
+        sel.innerHTML = '';
+        if (allBoards.length === 0) {
+          sel.innerHTML = '<option value="">No hay tableros disponibles</option>';
+          return;
+        }
+
+        allBoards.forEach(b => {
+          const opt = document.createElement('option');
+          opt.value = b.id;
+          opt.textContent = `[${b.type.toUpperCase()}] ${b.name} (#${b.id})`;
+          sel.appendChild(opt);
+        });
+
+        // Auto select first board
+        if (allBoards.length > 0) {
+          loadSelectedBoard();
+        }
+      } catch (err) {
+        console.error(err);
+        const errContainer = document.getElementById('boardColumnsContainer');
+        errContainer.innerHTML = '';
+        const msg = document.createElement('div');
+        msg.style.cssText = 'margin: auto; color: #f87171;';
+        msg.textContent = 'Error conectando con el servidor: ' + err.message;
+        errContainer.appendChild(msg);
+      }
+    }
+
+    function setMode(isLocal) {
+      localOnly = isLocal;
+      document.getElementById('btnModeLocal').classList.toggle('active', isLocal);
+      document.getElementById('btnModeLive').classList.toggle('active', !isLocal);
+      loadSelectedBoard();
+    }
+
+    async function loadSelectedBoard() {
+      const boardID = document.getElementById('boardSelect').value;
+      if (!boardID) return;
+
+      const container = document.getElementById('boardColumnsContainer');
+      container.innerHTML = `<div style="margin: auto;"><div class="spinner"></div><p style="margin-top: 10px; color: var(--text-muted);">Cargando tablero #${escapeHTML(boardID)} (${localOnly ? 'SQLite Local' : 'Jira API'})...</p></div>`;
+
+      try {
+        const res = await fetch(`/api/board?id=${encodeURIComponent(boardID)}&local=${localOnly}`);
+        if (!res.ok) {
+          const errData = await res.text();
+          throw new Error(errData || "Error al obtener vista del tablero");
+        }
+        boardData = await res.json();
+        renderBoard(boardData);
+      } catch (err) {
+        container.innerHTML = '';
+        const errDiv = document.createElement('div');
+        errDiv.style.cssText = 'margin: auto; color: #f87171; text-align: center;';
+        const p = document.createElement('p');
+        p.textContent = 'Error cargando tablero:';
+        const pre = document.createElement('pre');
+        pre.style.marginTop = '8px';
+        pre.textContent = err.message;
+        errDiv.appendChild(p);
+        errDiv.appendChild(pre);
+        container.appendChild(errDiv);
+      }
+    }
+
+    function renderBoard(data) {
+      document.getElementById('boardTitle').textContent = data.boardName || `Tablero #${data.boardId}`;
+      
+      const badgeType = document.getElementById('badgeType');
+      badgeType.style.display = 'inline-block';
+      badgeType.textContent = (data.boardType || 'KANBAN').toUpperCase();
+      badgeType.className = `badge ${data.boardType === 'scrum' ? 'badge-scrum' : 'badge-kanban'}`;
+
+      const badgeProj = document.getElementById('badgeProject');
+      if (data.projectKey) {
+        badgeProj.style.display = 'inline-block';
+        badgeProj.textContent = data.projectKey;
+      } else {
+        badgeProj.style.display = 'none';
+      }
+
+      const sprintInfo = document.getElementById('sprintInfo');
+      if (data.activeSprint) {
+        sprintInfo.style.display = 'flex';
+        document.getElementById('sprintName').textContent = data.activeSprint.name;
+        document.getElementById('sprintEnd').textContent = data.activeSprint.endDate ? data.activeSprint.endDate.substring(0, 10) : 'N/A';
+      } else {
+        sprintInfo.style.display = 'none';
+      }
+
+      const container = document.getElementById('boardColumnsContainer');
+      container.innerHTML = '';
+
+      // Render Columns
+      if (data.columns && data.columns.length > 0) {
+        data.columns.forEach(col => {
+          const colEl = document.createElement('div');
+          colEl.className = 'column';
+          const safeColName = escapeHTML(col.name);
+          const cardCount = col.cards ? col.cards.length : 0;
+          colEl.innerHTML = `
+            <div class="column-header">
+              <span>${safeColName}</span>
+              <span class="column-count">${cardCount}</span>
+            </div>
+            <div class="card-list"></div>
+          `;
+          colEl.querySelector('.card-list').setAttribute('data-column', col.name);
+
+          const listEl = colEl.querySelector('.card-list');
+          if (col.cards && col.cards.length > 0) {
+            col.cards.forEach(card => {
+              listEl.appendChild(createCardElement(card));
+            });
+          }
+          container.appendChild(colEl);
+        });
+      }
+
+      // Render Backlog Column if exists
+      if (data.backlog && data.backlog.length > 0) {
+        const backlogCol = document.createElement('div');
+        backlogCol.className = 'column backlog-column';
+        backlogCol.innerHTML = `
+          <div class="column-header">
+            <span>📦 Backlog</span>
+            <span class="column-count">${data.backlog.length}</span>
+          </div>
+          <div class="card-list" data-column="Backlog"></div>
+        `;
+        const bListEl = backlogCol.querySelector('.card-list');
+        data.backlog.forEach(card => {
+          bListEl.appendChild(createCardElement(card));
+        });
+        container.appendChild(backlogCol);
+      }
+    }
+
+    function createCardElement(card) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.setAttribute('data-key', card.key || '');
+      el.setAttribute('data-summary', card.summary || '');
+      el.setAttribute('data-assignee', card.assigneeName || '');
+
+      let prioClass = 'prio-med';
+      if (card.priority && card.priority.toLowerCase().includes('high')) prioClass = 'prio-high';
+      if (card.priority && card.priority.toLowerCase().includes('low')) prioClass = 'prio-low';
+
+      const initials = card.assigneeName ? card.assigneeName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+
+      const safeKey = escapeHTML(card.key);
+      const safeType = escapeHTML(card.issueType || 'Issue');
+      const safeSummary = escapeHTML(card.summary);
+      const safeFirstName = escapeHTML(card.assigneeName ? card.assigneeName.split(' ')[0] : 'Sin asignar');
+      const safeInitials = escapeHTML(initials);
+      const safePrio = escapeHTML(card.priority || 'Normal');
+
+      el.innerHTML = `
+        <div class="card-top">
+          <span class="card-key">${safeKey}</span>
+          <span class="card-type">${safeType}</span>
+        </div>
+        <div class="card-summary">${safeSummary}</div>
+        <div class="card-footer">
+          <div class="card-assignee">
+            <div class="avatar-circle">${safeInitials}</div>
+            <span>${safeFirstName}</span>
+          </div>
+          <span class="prio-indicator ${prioClass}" title="Prioridad: ${safePrio}"></span>
+        </div>
+      `;
+
+      el.onclick = () => openModal(card);
+      return el;
+    }
+
+    function filterCards() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(c => {
+        const key = (c.getAttribute('data-key') || '').toLowerCase();
+        const sum = (c.getAttribute('data-summary') || '').toLowerCase();
+        const ass = (c.getAttribute('data-assignee') || '').toLowerCase();
+        if (key.includes(q) || sum.includes(q) || ass.includes(q)) {
+          c.style.display = 'flex';
+        } else {
+          c.style.display = 'none';
+        }
+      });
+    }
+
+    async function triggerSync() {
+      if (!boardData || !boardData.projectKey) {
+        alert("No se pudo determinar el proyecto del tablero actual para sincronizar.");
+        return;
+      }
+      const btn = document.getElementById('btnSync');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Sincronizando...`;
+
+      try {
+        const res = await fetch(`/api/sync?project=${encodeURIComponent(boardData.projectKey)}`, { method: 'POST' });
+        const resData = await res.json();
+        alert(`Sincronización completada: ${resData.issuesSyncedCount || 0} tickets actualizados.`);
+        loadSelectedBoard();
+      } catch (err) {
+        alert("Error en la sincronización: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<span id="syncIcon">⟳</span> Sincronizar`;
+      }
+    }
+
+    function openModal(card) {
+      document.getElementById('modalKey').textContent = card.key;
+      document.getElementById('modalType').textContent = card.issueType || 'Task';
+      document.getElementById('modalSummary').textContent = card.summary;
+      document.getElementById('modalStatus').textContent = card.status || '-';
+      document.getElementById('modalPriority').textContent = card.priority || 'Normal';
+      document.getElementById('modalAssignee').textContent = card.assigneeName || 'Sin asignar';
+      document.getElementById('modalUpdated').textContent = card.updatedAt || 'Reciente';
+
+      const link = document.getElementById('modalJiraLink');
+      link.href = `/browse/${encodeURIComponent(card.key)}`;
+
+      document.getElementById('cardModalOverlay').style.display = 'grid';
+    }
+
+    function closeModal() {
+      document.getElementById('cardModalOverlay').style.display = 'none';
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
