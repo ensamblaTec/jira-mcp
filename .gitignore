@@ -1,6 +1,7 @@
 # Binaries
 bin/
 /jira-mcp
+cmd/jira-mcp/jira-mcp
 *.exe
 *.exe~
 *.dll
@@ -11,8 +12,7 @@ bin/
 *.test
 *.out
 *.prof
-coverage.html
-coverage.txt
+coverage.*
 cover.out
 
 # Local databases
@@ -24,9 +24,13 @@ cover.out
 .env
 .env.*
 !.env.example
+.envrc
+secrets.*
+*.secrets*
 .secrets*
 *.secret*
 *credentials*
+!*.go
 *.key
 *.pem
 *.crt

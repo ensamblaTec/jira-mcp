@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -972,4 +973,109 @@ func TestUpdateIssue_AtomicLabels(t *testing.T) {
 	if assignee["accountId"] != "acc-auto-me" {
 		t.Errorf("expected acc-auto-me assignee, got: %+v", assignee)
 	}
+}
+
+func TestIssueRequestUnmarshalSnakeAndCamel(t *testing.T) {
+	t.Run("CreateIssueRequest camelCase", func(t *testing.T) {
+		payload := `{
+			"projectKey": "PROJ",
+			"issueType": "Story",
+			"summary": "Camel summary",
+			"parentKey": "PROJ-10",
+			"dueDate": "2026-12-31",
+			"fixVersions": ["1.0.0"],
+			"customFields": {"customfield_1001": "alpha"}
+		}`
+		var req CreateIssueRequest
+		if err := json.Unmarshal([]byte(payload), &req); err != nil {
+			t.Fatalf("Unmarshal failed: %v", err)
+		}
+		if req.ProjectKey != "PROJ" || req.IssueType != "Story" || req.ParentKey != "PROJ-10" || req.DueDate != "2026-12-31" {
+			t.Errorf("unexpected scalar fields: %+v", req)
+		}
+		if !reflect.DeepEqual(req.FixVersions, []string{"1.0.0"}) {
+			t.Errorf("unexpected FixVersions: %v", req.FixVersions)
+		}
+		if req.CustomFields["customfield_1001"] != "alpha" {
+			t.Errorf("unexpected CustomFields: %v", req.CustomFields)
+		}
+	})
+
+	t.Run("CreateIssueRequest snake_case", func(t *testing.T) {
+		payload := `{
+			"project_key": "TEST",
+			"issue_type": "Bug",
+			"summary": "Snake summary",
+			"parent_key": "TEST-1",
+			"due_date": "2026-11-30",
+			"fix_versions": ["2.0.0", "2.1.0"],
+			"custom_fields": {"customfield_1002": "beta"}
+		}`
+		var req CreateIssueRequest
+		if err := json.Unmarshal([]byte(payload), &req); err != nil {
+			t.Fatalf("Unmarshal failed: %v", err)
+		}
+		if req.ProjectKey != "TEST" || req.IssueType != "Bug" || req.ParentKey != "TEST-1" || req.DueDate != "2026-11-30" {
+			t.Errorf("unexpected scalar fields: %+v", req)
+		}
+		if !reflect.DeepEqual(req.FixVersions, []string{"2.0.0", "2.1.0"}) {
+			t.Errorf("unexpected FixVersions: %v", req.FixVersions)
+		}
+		if req.CustomFields["customfield_1002"] != "beta" {
+			t.Errorf("unexpected CustomFields: %v", req.CustomFields)
+		}
+	})
+
+	t.Run("CreateIssueRequest invalid JSON", func(t *testing.T) {
+		var req CreateIssueRequest
+		if err := json.Unmarshal([]byte(`{"project_key": 123`), &req); err == nil {
+			t.Fatal("expected error for malformed JSON")
+		}
+	})
+
+	t.Run("UpdateIssueRequest camelCase and snake_case", func(t *testing.T) {
+		camel := `{
+			"addLabels": ["backend"],
+			"removeLabels": ["stale"],
+			"fixVersions": ["1.2.0"],
+			"dueDate": "2026-12-01",
+			"customFields": {"customfield_2001": 42}
+		}`
+		var reqCamel UpdateIssueRequest
+		if err := json.Unmarshal([]byte(camel), &reqCamel); err != nil {
+			t.Fatalf("camelCase Unmarshal failed: %v", err)
+		}
+		if !reflect.DeepEqual(reqCamel.AddLabels, []string{"backend"}) || !reflect.DeepEqual(reqCamel.RemoveLabels, []string{"stale"}) {
+			t.Errorf("unexpected camelCase labels: %+v", reqCamel)
+		}
+		if !reflect.DeepEqual(reqCamel.FixVersions, []string{"1.2.0"}) || reqCamel.DueDate != "2026-12-01" {
+			t.Errorf("unexpected camelCase fields: %+v", reqCamel)
+		}
+
+		snake := `{
+			"add_labels": ["urgent", "api"],
+			"remove_labels": ["wontfix"],
+			"fix_versions": ["3.0.0"],
+			"due_date": "2026-12-15",
+			"custom_fields": {"customfield_2002": "gamma"}
+		}`
+		var reqSnake UpdateIssueRequest
+		if err := json.Unmarshal([]byte(snake), &reqSnake); err != nil {
+			t.Fatalf("snake_case Unmarshal failed: %v", err)
+		}
+		if !reflect.DeepEqual(reqSnake.AddLabels, []string{"urgent", "api"}) || !reflect.DeepEqual(reqSnake.RemoveLabels, []string{"wontfix"}) {
+			t.Errorf("unexpected snake_case labels: %+v", reqSnake)
+		}
+		if !reflect.DeepEqual(reqSnake.FixVersions, []string{"3.0.0"}) || reqSnake.DueDate != "2026-12-15" {
+			t.Errorf("unexpected snake_case fields: %+v", reqSnake)
+		}
+		if reqSnake.CustomFields["customfield_2002"] != "gamma" {
+			t.Errorf("unexpected snake_case custom_fields: %v", reqSnake.CustomFields)
+		}
+
+		var bad UpdateIssueRequest
+		if err := json.Unmarshal([]byte(`{"add_labels": "not-an-array"}`), &bad); err == nil {
+			t.Fatal("expected error for invalid add_labels type")
+		}
+	})
 }
